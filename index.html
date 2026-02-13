@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="論文管理">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon.svg">
+<title>論文進捗トラッカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --accent: #c0392b;
+    --muted: #7f8c8d;
+    --card: #fffdf8;
+    --border: #d5cfc4;
+    --success: #27ae60;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--ink);
+    color: var(--ink);
+  }
+
+  /* アプリシェル */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+
+  /* ヘッダー */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: calc(var(--safe-top) + 14px) 20px 14px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1.15rem;
+    letter-spacing: 0.15em;
+  }
+
+  header p {
+    font-size: 0.65rem;
+    opacity: 0.5;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  /* コンテンツエリア */
+  #content {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--paper);
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 27px,
+      rgba(0,0,0,0.04) 27px, rgba(0,0,0,0.04) 28px
+    );
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px calc(var(--safe-bottom) + 80px);
+  }
+
+  /* ボトムナビ */
+  nav {
+    display: flex;
+    background: var(--ink);
+    border-top: 2px solid var(--accent);
+    padding-bottom: var(--safe-bottom);
+    flex-shrink: 0;
+  }
+
+  nav button {
+    flex: 1;
+    padding: 10px 4px 8px;
+    background: none;
+    border: none;
+    color: rgba(245,240,232,0.45);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.62rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  nav button .nav-icon { font-size: 1.3rem; line-height: 1; }
+  nav button.active { color: var(--paper); }
+  nav button.active .nav-icon { filter: drop-shadow(0 0 4px rgba(192,57,43,0.6)); }
+
+  /* ページ */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* カード */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.06);
+  }
+
+  .card-title {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  /* フォーム */
+  label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 5px;
+    margin-top: 14px;
+    letter-spacing: 0.04em;
+  }
+  label:first-of-type { margin-top: 0; }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    background: #fefcf8;
+    color: var(--ink);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { resize: none; height: 80px; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: opacity 0.15s;
+    -webkit-appearance: none;
+  }
+  .btn:active { opacity: 0.75; }
+  .btn.secondary { background: var(--ink); }
+
+  /* 進捗リング */
+  .ring-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+
+  .ring-container { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+  .ring-container svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: #e8e0d0; stroke-width: 9; }
+  .ring-progress {
+    fill: none; stroke: var(--accent); stroke-width: 9; stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease;
+  }
+  .ring-label {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); text-align: center;
+  }
+  .ring-pct { font-family: 'Noto Sans JP', sans-serif; font-size: 1.5rem; font-weight: 700; line-height: 1; }
+  .ring-sub { font-size: 0.58rem; color: var(--muted); }
+
+  /* スタッツ */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+  .stat-box { background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 10px; text-align: center; }
+  .stat-val { font-family: 'Noto Sans JP', sans-serif; font-size: 1.1rem; font-weight: 700; }
+  .stat-lbl { font-size: 0.6rem; color: var(--muted); margin-top: 2px; }
+
+  /* バナー */
+  .banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 5px; margin-bottom: 14px; font-size: 0.82rem;
+  }
+  .banner.good { background: #eafaf1; border: 1px solid #a9dfbf; color: #1e8449; }
+  .banner.warn { background: #fef9e7; border: 1px solid #f9e79f; color: #b7950b; }
+  .banner.none { background: #fdfefe; border: 1px solid var(--border); color: var(--muted); }
+
+  /* 締切チップ */
+  .chip {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 0.7rem; font-weight: 500; margin-left: 6px;
+  }
+  .chip.urgent { background: #fdecea; color: var(--accent); }
+  .chip.normal { background: #e8f4fd; color: #2471a3; }
+  .chip.ok { background: #eafaf1; color: var(--success); }
+
+  /* チャート */
+  .chart-wrap { position: relative; height: 170px; margin-top: 6px; }
+
+  /* ログ */
+  .log-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-date { font-size: 0.72rem; color: var(--muted); min-width: 52px; padding-top: 2px; }
+  .log-body { flex: 1; }
+  .log-words { font-size: 0.95rem; font-weight: 500; }
+  .log-note { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .log-bar-wrap { height: 4px; background: #e8e0d0; border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .log-bar { height: 100%; border-radius: 2px; background: var(--accent); }
+  .log-bar.over { background: var(--success); }
+  .log-del { background: none; border: none; color: #ccc; font-size: 1.1rem; padding: 4px; cursor: pointer; }
+
+  /* 空状態 */
+  .empty { text-align: center; padding: 50px 20px; color: var(--muted); font-size: 0.82rem; line-height: 2.2; }
+  .empty .icon { font-size: 2.8rem; margin-bottom: 10px; }
+
+  /* インストール案内 */
+  .install-tip {
+    background: #fff8e1; border: 1px solid #ffe082; border-radius: 5px;
+    padding: 12px 14px; font-size: 0.76rem; color: #795548;
+    margin-bottom: 14px; line-height: 1.7; display: none;
+  }
+  .install-tip.show { display: block; }
+  .install-tip strong { display: block; margin-bottom: 4px; font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>論文進捗トラッカー</h1>
+    <p>Academic Writing Manager</p>
+  </header>
+
+  <div id="content">
+
+    <!-- ホーム -->
+    <div id="page-home" class="page active">
+      <div id="install-tip" class="install-tip"></div>
+      <div id="home-content"></div>
+    </div>
+
+    <!-- 記録 -->
+    <div id="page-input" class="page">
+      <div class="card">
+        <div class="card-title">今日の執筆記録</div>
+        <label>執筆日</label>
+        <input type="date" id="input-date">
+        <!-- 入力モード切替 -->
+        <div style="display:flex; gap:8px; margin-bottom:4px;">
+          <button id="mode-btn-range" onclick="setMode('range')" style="flex:1; padding:9px; border-radius:4px; border:2px solid var(--accent); background:var(--accent); color:white; font-family:'Noto Sans JP',sans-serif; font-size:0.78rem; cursor:pointer;">開始／終了で入力</button>
+          <button id="mode-btn-direct" onclick="setMode('direct')" style="flex:1; padding:9px; border-radius:4px; border:2px solid var(--border); background:var(--card); color:var(--muted); font-family:'Noto Sans JP',sans-serif; font-size:0.78rem; cursor:pointer;">字数を直接入力</button>
+        </div>
+
+        <!-- 開始／終了モード -->
+        <div id="mode-range">
+          <label>書き始めの文字数（執筆前）</label>
+          <input type="number" id="input-words-start" placeholder="例: 5200" min="0" inputmode="numeric" oninput="calcDiff()">
+          <label>書き終わりの文字数（執筆後）</label>
+          <input type="number" id="input-words-end" placeholder="例: 6050" min="0" inputmode="numeric" oninput="calcDiff()">
+        </div>
+
+        <!-- 直接入力モード -->
+        <div id="mode-direct" style="display:none;">
+          <label>本日の執筆字数</label>
+          <input type="number" id="input-words-direct" placeholder="例: 850" min="0" inputmode="numeric">
+        </div>
+
+        <div id="diff-preview" style="display:none; margin-top:10px; padding:11px 14px; border-radius:4px; font-size:0.85rem; line-height:1.5;"></div>
+        <label>メモ（任意）</label>
+        <textarea id="input-note" placeholder="今日の気づき・作業内容など..."></textarea>
+        <button class="btn" onclick="saveLog()">記録する</button>
+      </div>
+    </div>
+
+    <!-- 履歴 -->
+    <div id="page-log" class="page">
+      <div class="card">
+        <div class="card-title">直近14日間</div>
+        <div class="chart-wrap"><canvas id="chart-log"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">記録一覧</div>
+        <div id="log-list"></div>
+      </div>
+    </div>
+
+    <!-- 設定 -->
+    <div id="page-settings" class="page">
+      <div class="card">
+        <div class="card-title">論文の目標設定</div>
+        <label>論文タイトル（任意）</label>
+        <input type="text" id="set-title" placeholder="例: 現代日本における家族構造の変容">
+        <label>目標総字数</label>
+        <input type="number" id="set-total" placeholder="例: 20000" inputmode="numeric">
+        <label>執筆開始日</label>
+        <input type="date" id="set-start">
+        <label>提出締切日</label>
+        <input type="date" id="set-deadline">
+        <label>1日のノルマ字数</label>
+        <input type="number" id="set-daily" placeholder="例: 500" inputmode="numeric">
+        <button class="btn" onclick="saveSettings()">保存する</button>
+      </div>
+      <div class="card">
+        <div class="card-title">データ管理</div>
+        <button class="btn secondary" onclick="exportData()">データをエクスポート</button>
+        <label style="margin-top:14px;">インポート（JSONファイル）</label>
+        <input type="file" id="import-file" accept=".json" onchange="importData(event)" style="font-size:0.82rem; padding:10px;">
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <nav>
+    <button class="active" onclick="showPage('home', this)">
+      <span class="nav-icon">📊</span>ホーム
+    </button>
+    <button onclick="showPage('input', this)">
+      <span class="nav-icon">✏️</span>記録
+    </button>
+    <button onclick="showPage('log', this)">
+      <span class="nav-icon">📋</span>履歴
+    </button>
+    <button onclick="showPage('settings', this)">
+      <span class="nav-icon">⚙️</span>設定
+    </button>
+  </nav>
+</div>
+
+<script>
+// ===== ユーティリティ =====
+const today = () => new Date().toISOString().split('T')[0];
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem('ronbun_v2') || '{"settings":{},"logs":[]}'); }
+  catch(e) { return { settings:{}, logs:[] }; }
+}
+function saveData(d) { localStorage.setItem('ronbun_v2', JSON.stringify(d)); }
+
+// ===== Service Worker 登録 =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ===== インストール案内 =====
+function showInstallTip() {
+  const tip = document.getElementById('install-tip');
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone;
+  if (isStandalone) return;
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  if (isIOS) {
+    tip.innerHTML = `<strong>📱 ホーム画面に追加できます</strong>
+      Safariの共有ボタン（↑）→「ホーム画面に追加」でアプリとして使えます`;
+    tip.classList.add('show');
+  } else if (isAndroid) {
+    tip.innerHTML = `<strong>📱 ホーム画面に追加できます</strong>
+      Chromeのメニュー（⋮）→「ホーム画面に追加」でアプリとして使えます`;
+    tip.classList.add('show');
+  }
+}
+
+// ===== ページ切替 =====
+let chartInstances = {};
+
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  document.getElementById('content').scrollTop = 0;
+
+  if (name === 'home') renderHome();
+  if (name === 'log') renderLog();
+}
+
+// ===== ホーム =====
+function renderHome() {
+  const { settings: s, logs } = getData();
+  const el = document.getElementById('home-content');
+  showInstallTip();
+
+  if (!s.total) {
+    el.innerHTML = `<div class="empty">
+      <div class="icon">📝</div>
+      まずは「設定」から<br>論文の目標を入力してください
+    </div>`;
+    return;
+  }
+
+  const totalWritten = logs.reduce((a, l) => a + (l.words || 0), 0);
+  const pct = Math.min(100, Math.round(totalWritten / s.total * 100));
+  const radius = 40, circ = 2 * Math.PI * radius;
+  const offset = circ - (pct / 100) * circ;
+
+  // 締切
+  let deadlineHTML = '', daysLeft = null;
+  if (s.deadline) {
+    const now = new Date(); now.setHours(0,0,0,0);
+    const dl = new Date(s.deadline);
+    daysLeft = Math.ceil((dl - now) / 86400000);
+    const cls = daysLeft <= 7 ? 'urgent' : daysLeft <= 30 ? 'normal' : 'ok';
+    deadlineHTML = `<span class="chip ${cls}">締切まで${daysLeft}日</span>`;
+  }
+
+  // 今日バナー
+  const todayLog = logs.find(l => l.date === today());
+  let bannerHTML = '';
+  if (todayLog) {
+    const over = todayLog.words >= (s.daily || 0);
+    const short = Math.max(0, (s.daily||0) - todayLog.words);
+    bannerHTML = `<div class="banner ${over ? 'good' : 'warn'}">
+      ${over ? '✅' : '⚠️'}
+      <div>今日 <strong>${todayLog.words.toLocaleString()}字</strong> 執筆済み
+      ${over ? '— ノルマ達成！' : `（あと${short.toLocaleString()}字）`}</div>
+    </div>`;
+  } else {
+    bannerHTML = `<div class="banner none">📌 今日の記録がまだありません</div>`;
+  }
+
+  // 連続日数
+  const sorted = [...logs].sort((a,b) => b.date.localeCompare(a.date));
+  let streak = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - i);
+    if (sorted[i]?.date === d.toISOString().split('T')[0]) streak++;
+    else break;
+  }
+
+  // 必要ペース
+  const remaining = Math.max(0, s.total - totalWritten);
+  let paceBox = '';
+  if (daysLeft > 0 && remaining > 0) {
+    const needed = Math.ceil(remaining / daysLeft);
+    paceBox = `<div class="stat-box"><div class="stat-val">${needed.toLocaleString()}</div><div class="stat-lbl">必要日次字数</div></div>`;
+  }
+
+  el.innerHTML = `
+    ${bannerHTML}
+    <div class="card">
+      <div class="card-title">${s.title || '論文'} ${deadlineHTML}</div>
+      <div class="ring-wrap">
+        <div class="ring-container">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <circle class="ring-bg" cx="48" cy="48" r="${radius}"/>
+            <circle class="ring-progress" cx="48" cy="48" r="${radius}"
+              stroke-dasharray="${circ.toFixed(1)}"
+              stroke-dashoffset="${offset.toFixed(1)}"/>
+          </svg>
+          <div class="ring-label">
+            <div class="ring-pct">${pct}%</div>
+            <div class="ring-sub">完了</div>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="stat-val">${totalWritten.toLocaleString()}</div><div class="stat-lbl">執筆済み字数</div></div>
+          <div class="stat-box"><div class="stat-val">${remaining.toLocaleString()}</div><div class="stat-lbl">残り字数</div></div>
+          <div class="stat-box"><div class="stat-val">${streak}</div><div class="stat-lbl">連続執筆日</div></div>
+          ${paceBox}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">直近7日間</div>
+      <div class="chart-wrap" style="height:150px;"><canvas id="chart-home"></canvas></div>
+    </div>`;
+
+  // ホームチャート
+  const ctx = document.getElementById('chart-home');
+  const labels=[], values=[];
+  for (let i=6; i>=0; i--) {
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const str=d.toISOString().split('T')[0];
+    labels.push(str.slice(5));
+    const l=logs.find(x=>x.date===str);
+    values.push(l?l.words:0);
+  }
+  if (chartInstances['home']) chartInstances['home'].destroy();
+  chartInstances['home'] = new Chart(ctx, {
+    type:'bar', data:{
+      labels, datasets:[{
+        data:values,
+        backgroundColor:values.map(v=>v>=(s.daily||0)?'#27ae60':'#c0392b'),
+        borderRadius:3
+      }]
+    }, options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.raw.toLocaleString()+'字'}} },
+      scales:{ y:{beginAtZero:true,ticks:{font:{size:10}}}, x:{ticks:{font:{size:10}}} }
+    }
+  });
+}
+
+// ===== モード切替 =====
+let inputMode = 'range';
+function setMode(mode) {
+  inputMode = mode;
+  document.getElementById('mode-range').style.display = mode === 'range' ? 'block' : 'none';
+  document.getElementById('mode-direct').style.display = mode === 'direct' ? 'block' : 'none';
+  const btnRange = document.getElementById('mode-btn-range');
+  const btnDirect = document.getElementById('mode-btn-direct');
+  if (mode === 'range') {
+    btnRange.style.background = 'var(--accent)'; btnRange.style.borderColor = 'var(--accent)'; btnRange.style.color = 'white';
+    btnDirect.style.background = 'var(--card)'; btnDirect.style.borderColor = 'var(--border)'; btnDirect.style.color = 'var(--muted)';
+  } else {
+    btnDirect.style.background = 'var(--accent)'; btnDirect.style.borderColor = 'var(--accent)'; btnDirect.style.color = 'white';
+    btnRange.style.background = 'var(--card)'; btnRange.style.borderColor = 'var(--border)'; btnRange.style.color = 'var(--muted)';
+  }
+  document.getElementById('diff-preview').style.display = 'none';
+}
+
+// ===== 差分プレビュー =====
+function calcDiff() {
+  const start = parseInt(document.getElementById('input-words-start').value);
+  const end = parseInt(document.getElementById('input-words-end').value);
+  const preview = document.getElementById('diff-preview');
+  if (!isNaN(start) && !isNaN(end)) {
+    const diff = end - start;
+    if (diff >= 0) {
+      preview.style.display = 'block';
+      preview.style.background = '#eafaf1';
+      preview.style.border = '1px solid #a9dfbf';
+      preview.style.color = '#1e8449';
+      preview.textContent = '✏️ 本日の執筆字数：' + diff.toLocaleString() + ' 字（' + start.toLocaleString() + ' → ' + end.toLocaleString() + '）';
+    } else {
+      preview.style.display = 'block';
+      preview.style.background = '#fdecea';
+      preview.style.border = '1px solid #f5b7b1';
+      preview.style.color = '#c0392b';
+      preview.textContent = '⚠️ 書き終わりの文字数が書き始めより少なくなっています';
+    }
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+// ===== 記録保存 =====
+function saveLog() {
+  const date = document.getElementById('input-date').value;
+  const note = document.getElementById('input-note').value.trim();
+  let words, wordStart = null, wordEnd = null;
+
+  if (inputMode === 'range') {
+    const start = parseInt(document.getElementById('input-words-start').value);
+    const end = parseInt(document.getElementById('input-words-end').value);
+    if (!date || isNaN(start) || isNaN(end) || start < 0 || end < 0) {
+      alert('日付・書き始め・書き終わりの文字数を正しく入力してください'); return;
+    }
+    if (end < start) {
+      if (!confirm('書き終わりが書き始めより少ないです。このまま記録しますか？')) return;
+    }
+    words = end - start;
+    wordStart = start;
+    wordEnd = end;
+  } else {
+    const direct = parseInt(document.getElementById('input-words-direct').value);
+    if (!date || isNaN(direct) || direct < 0) {
+      alert('日付と執筆字数を正しく入力してください'); return;
+    }
+    words = direct;
+  }
+
+  const data = getData();
+  const idx = data.logs.findIndex(l => l.date === date);
+  const entry = { date, words, wordStart, wordEnd, note };
+  if (idx >= 0) {
+    if (!confirm(date + ' の記録を上書きしますか？')) return;
+    data.logs[idx] = entry;
+  } else {
+    data.logs.push(entry);
+  }
+  saveData(data);
+  document.getElementById('input-words-start').value = '';
+  document.getElementById('input-words-end').value = '';
+  document.getElementById('input-words-direct').value = '';
+  document.getElementById('input-note').value = '';
+  document.getElementById('diff-preview').style.display = 'none';
+  alert('✅ 記録しました！');
+}
+
+// ===== 履歴 =====
+function renderLog() {
+  const { settings: s, logs } = getData();
+  const sorted = [...logs].sort((a,b) => b.date.localeCompare(a.date));
+
+  // チャート
+  const ctx = document.getElementById('chart-log');
+  const recent = sorted.slice(0, 14).reverse();
+  if (chartInstances['log']) chartInstances['log'].destroy();
+  chartInstances['log'] = new Chart(ctx, {
+    type:'bar', data:{
+      labels:recent.map(l=>l.date.slice(5)),
+      datasets:[{ data:recent.map(l=>l.words),
+        backgroundColor:recent.map(l=>l.words>=(s.daily||0)?'#27ae60':'#c0392b'),
+        borderRadius:3 }]
+    }, options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.raw.toLocaleString()+'字'}} },
+      scales:{ y:{beginAtZero:true,ticks:{font:{size:10}}}, x:{ticks:{font:{size:10},maxRotation:45}} }
+    }
+  });
+
+  // リスト
+  const el = document.getElementById('log-list');
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">📭</div>記録がありません</div>';
+    return;
+  }
+  el.innerHTML = sorted.map(l => {
+    const pct = s.daily ? Math.min(100, Math.round(l.words/s.daily*100)) : 0;
+    const over = s.daily && l.words >= s.daily;
+    const rangeHTML = (l.wordStart != null && l.wordEnd != null)
+      ? `<span style="font-size:0.68rem;color:var(--muted);margin-left:5px;">${l.wordStart.toLocaleString()}→${l.wordEnd.toLocaleString()}</span>`
+      : '';
+    return `<div class="log-item">
+      <div class="log-date">${l.date.slice(5).replace('-','/')}</div>
+      <div class="log-body">
+        <div class="log-words">${l.words.toLocaleString()}字 ${over?'✅':''}${rangeHTML}</div>
+        ${l.note?`<div class="log-note">${l.note}</div>`:''}
+        ${s.daily?`<div class="log-bar-wrap"><div class="log-bar ${over?'over':''}" style="width:${pct}%"></div></div>`:''}
+      </div>
+      <button class="log-del" onclick="deleteLog('${l.date}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteLog(date) {
+  if (!confirm(`${date} の記録を削除しますか？`)) return;
+  const data = getData();
+  data.logs = data.logs.filter(l => l.date !== date);
+  saveData(data);
+  renderLog();
+}
+
+// ===== 設定 =====
+function saveSettings() {
+  const data = getData();
+  data.settings = {
+    title: document.getElementById('set-title').value,
+    total: parseInt(document.getElementById('set-total').value) || 0,
+    start: document.getElementById('set-start').value,
+    deadline: document.getElementById('set-deadline').value,
+    daily: parseInt(document.getElementById('set-daily').value) || 0,
+  };
+  saveData(data);
+  alert('✅ 設定を保存しました！');
+}
+
+function exportData() {
+  const data = getData();
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ronbun_data.json';
+  a.click();
+}
+
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try { saveData(JSON.parse(ev.target.result)); alert('✅ インポートしました！'); renderHome(); }
+    catch { alert('❌ 読み込みに失敗しました'); }
+  };
+  r.readAsText(file);
+}
+
+// ===== 初期化 =====
+(function init() {
+  document.getElementById('input-date').value = today();
+  const s = getData().settings;
+  if (s.title) document.getElementById('set-title').value = s.title;
+  if (s.total) document.getElementById('set-total').value = s.total;
+  if (s.start) document.getElementById('set-start').value = s.start;
+  if (s.deadline) document.getElementById('set-deadline').value = s.deadline;
+  if (s.daily) document.getElementById('set-daily').value = s.daily;
+  renderHome();
+})();
+</script>
+</body>
+</html>

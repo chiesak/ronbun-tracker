@@ -1,0 +1,19 @@
+{
+  "name": "論文進捗トラッカー",
+  "short_name": "論文管理",
+  "description": "論文執筆のペースを管理するアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f0e8",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
